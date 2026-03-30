@@ -7,7 +7,7 @@ from PyQt5.QtGui import QImage, QPixmap
 class ImageProcessor(QMainWindow):
     def __init__(self):
         super(ImageProcessor, self).__init__() 
-        loadUi("./singular/interface.ui",self)
+        loadUi("./interface.ui",self)
         self.slider_red.valueChanged.connect(self.update_image)
         self.slider_green.valueChanged.connect(self.update_image)
         self.slider_blue.valueChanged.connect(self.update_image)
@@ -26,7 +26,7 @@ class ImageProcessor(QMainWindow):
         threshold = self.slider_threshold.value()
 
         # Raw image (no edits) — OpenCV loads as BGR
-        image = cv2.imread('Output/test/Fotografias/Foto-8.png')
+        image = cv2.imread('./images/test2/Fotografias/Tile_299937_559765.png')
         if image is None:
             return
 
@@ -88,5 +88,5 @@ Color           R   G   B
 Rojo oscuro     169 39  39
 Rojo            242 78  66
 Amarillo        255 207 67
-Verde           22  221 152
+Verde           22  224 152
 '''

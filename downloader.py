@@ -38,8 +38,11 @@ def getXY(lat,lng,zoom):
 def generateImage(x, y, zoom, count, path):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
     os.makedirs(path, exist_ok=True)
-    file_name = f"Foto-{count}.png"
+    file_name = f"Tile_{x}_{y}.png"
     file_path = os.path.join(path, file_name)
+    if os.path.isfile(file_path) and os.path.getsize(file_path) > 100:
+        print(f"[{count}] Tile_{x}_{y} already exists, skipping")
+        return
     response = None
     for s in TILE_SUBDOMAINS:
         try_url = TILE_URL.format(s=s, x=x, y=y, z=zoom)
@@ -47,7 +50,7 @@ def generateImage(x, y, zoom, count, path):
         if response.status_code == 200 and len(response.content) > 100:
             with open(file_path, "wb") as f:
                 f.write(response.content)
-            print(f"Foto-{count} saved successfully (tile {x},{y} z={zoom})")
+            print(f"[{count}] Tile_{x}_{y} saved (zoom={zoom})")
             return
         if response.status_code != 200:
             print(f"  {s}: status {response.status_code} for tile {x},{y}")
@@ -92,7 +95,11 @@ def _find_coordinates(root):
             return el.text.strip()
     return None
 
-def operator(path, zoom=20) -> None:
+def operator(path, zoom=20) -> str | None:
+    """Download all traffic tiles that intersect the KML polygon.
+
+    Returns the directory where tile images were saved, or None on error.
+    """
     _, name_kml = os.path.split(path)
     tree = ET.parse(path)
     root = tree.getroot()
@@ -100,17 +107,17 @@ def operator(path, zoom=20) -> None:
     coordinates_text = _find_coordinates(root)
     if not coordinates_text:
         print("No se encontraron coordenadas en el KML. Revisa que el archivo tenga un polígono con <coordinates>.")
-        return
+        return None
 
     coordinates_list = [coord.strip().split(",")[:2] for coord in coordinates_text.split()]
     if not coordinates_list:
         print("Coordenadas vacías en el KML.")
-        return
+        return None
     # KML order is longitude,latitude; Shapely uses (x,y) = (lon, lat)
     polygon_coordinates = [(float(c[0]), float(c[1])) for c in coordinates_list if len(c) == 2]
     if len(polygon_coordinates) < 3:
         print("Se necesitan al menos 3 puntos para un polígono.")
-        return
+        return None
     polygon = Polygon(polygon_coordinates)
     vertices_polygon = list(polygon.exterior.coords)
 
@@ -121,16 +128,15 @@ def operator(path, zoom=20) -> None:
 
     min_x, max_x, min_y, max_y = calculatePolygonBounds(vertices)
 
-    # Only count tiles that intersect the polygon
     tiles_to_download = [
         (i, j) for i in range(min_x, max_x + 1) for j in range(min_y, max_y + 1)
         if tile_intersects_polygon(i, j, zoom, polygon)
     ]
     total_images = len(tiles_to_download)
+    print(f"Tiles to download: {total_images}")
 
-    photos_path = os.path.join("Output", f"{name_kml[:-4]}", "Fotografias")
-    if not os.path.exists(photos_path):
-        os.makedirs(photos_path)
+    photos_path = os.path.join("images", f"{name_kml[:-4]}", "Fotografias")
+    os.makedirs(photos_path, exist_ok=True)
 
     count = 0
     for i, j in tiles_to_download:
@@ -139,10 +145,12 @@ def operator(path, zoom=20) -> None:
             time.sleep(1)
         count += 1
 
+    return photos_path
+
 # Lima, Peru (center) - example for single-tile test
 LIMA_LAT, LIMA_LON = -12.0464, -77.0428
 
-def download_single_tile(lat: float, lon: float, zoom: int = 20, out_dir: str = "Output") -> None:
+def download_single_tile(lat: float, lon: float, zoom: int = 20, out_dir: str = "images") -> None:
     """Download one map tile at the given lat/lon and zoom. Use this to test without a KML file."""
     tile_x, tile_y = getXY(lat, lon, zoom)
     path = os.path.join(out_dir, "single_tile")

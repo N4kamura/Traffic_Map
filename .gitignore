@@ -2,3 +2,6 @@ data/
 .venv/
 __pycache__/
 Output/
+*.db
+images/
+*.log
